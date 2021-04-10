@@ -1,0 +1,47 @@
+#!/bin/sh
+
+durationOfProvidedAudioFile=$( mp3info -p "%S\n" $1 );
+
+echo "Audio file duration: $durationOfProvidedAudioFile s";
+
+fps=1;
+seconds=$durationOfProvidedAudioFile;
+mantissaDigits=2;
+upperFont=300;
+lowerFont=0;
+
+# Generate video file
+ffmpeg \
+  -loop 1 \
+  -i ./BG.png \
+  -c:v libx264 \
+  -r $fps \
+  -t $seconds \
+  -pix_fmt yuv420p \
+  -vf "\
+    fps=$fps,\
+    drawtext=fontfile='./fonts/Oswald-Regular.ttf'\
+      :fontcolor=#202122\
+      :fontsize=$upperFont\
+      :x=(w-text_w)/2\
+      :y=(h-text_h)/2\
+      :text='%{eif\:(mod(($seconds-t)/60, 60))\:d\:2}\:%{eif\:(mod($seconds-t, 60))\:d\:2}',\
+    \
+    drawtext=fontfile='./fonts/Oswald-Regular.ttf'\
+    :fontcolor=#202122 \
+    :fontsize=$lowerFont \
+    :x=(w-text_w)/2 \
+    :y=((h-text_h)/2)+$upperFont \
+    :text='Elapsed\: %{pts\:gmtime\:0\:%H\\\\\:%M\\\\\:%S}'"  \
+  "$seconds seconds countdown timer.mp4"
+
+baseFileName=${1##*/}
+baseFileName="${baseFileName%.*}"
+
+# Merge it with audio
+ffmpeg -i "$seconds seconds countdown timer.mp4" -i $1 -c copy -map 0:v:0 -map 1:a:0 "./$baseFileName-timer.mp4"
+
+read -p "Do you want to remove the generated silent video file? (y/N): " shouldCleanUp
+
+[ $shouldCleanUp = "y" ] && echo "Deleting file" && rm "$seconds seconds countdown timer.mp4"
+
